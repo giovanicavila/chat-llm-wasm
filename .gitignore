@@ -25,3 +25,4 @@ dist-ssr
 
 # hide frontend-developer agent
 .github/agents/frontend-developer.md
+ARCHITECTURE.md

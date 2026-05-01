@@ -1,6 +1,8 @@
 import InputChat from "@/components/input-chat";
-import { useState } from "react";
+import { useLLM } from "@/hooks/use-llm";
+import { useCallback, useRef, useState } from "react";
 import { ChatConversation } from "./components/chat-conversation";
+import { ModelLoadingBanner } from "./components/model-loading-banner";
 
 type Message = {
 	id: string;
@@ -8,9 +10,6 @@ type Message = {
 	content: string;
 	timestamp: string;
 };
-
-const MOCK_AI_RESPONSE =
-	"I'm a local AI assistant running entirely in your browser via WebAssembly. That's a great question! I can help with coding, analysis, writing, and brainstorming. Since everything runs locally, your conversations stay completely private. What else would you like to explore?";
 
 function getTimestamp() {
 	return new Date().toLocaleTimeString([], {
@@ -21,43 +20,88 @@ function getTimestamp() {
 
 export function HomePage() {
 	const [messages, setMessages] = useState<Message[]>([]);
-	const [isLoading, setIsLoading] = useState(false);
+	const streamingIdRef = useRef<string | null>(null);
 
-	const handleSend = (text: string) => {
-		const userMessage: Message = {
-			id: crypto.randomUUID(),
-			role: "user",
-			content: text,
-			timestamp: getTimestamp(),
-		};
-		setMessages((prev) => [...prev, userMessage]);
-		setIsLoading(true);
+	const llm = useLLM();
 
-		setTimeout(() => {
-			const aiMessage: Message = {
+	const handleSend = useCallback(
+		(text: string) => {
+			if (llm.status !== "ready" || llm.isGenerating) return;
+
+			const userMessage: Message = {
 				id: crypto.randomUUID(),
-				role: "assistant",
-				content: MOCK_AI_RESPONSE,
+				role: "user",
+				content: text,
 				timestamp: getTimestamp(),
 			};
-			setMessages((prev) => [...prev, aiMessage]);
-			setIsLoading(false);
-		}, 1500);
-	};
+
+			const assistantId = crypto.randomUUID();
+			streamingIdRef.current = assistantId;
+
+			const assistantMessage: Message = {
+				id: assistantId,
+				role: "assistant",
+				content: "",
+				timestamp: getTimestamp(),
+			};
+
+			setMessages((prev) => [...prev, userMessage, assistantMessage]);
+
+			// Build the conversation history to give the model context
+			const history = [
+				...messages.map((m) => ({ role: m.role, content: m.content })),
+				{ role: "user" as const, content: text },
+			];
+
+			llm.send(
+				history,
+				(token) => {
+					setMessages((prev) =>
+						prev.map((m) =>
+							m.id === assistantId
+								? { ...m, content: m.content + token }
+								: m,
+						),
+					);
+				},
+				() => {
+					streamingIdRef.current = null;
+				},
+			);
+		},
+		[llm, messages],
+	);
+
+	const isInputDisabled = llm.status !== "ready" || llm.isGenerating;
 
 	if (messages.length === 0) {
 		return (
-			<div className="flex flex-1 items-center justify-center h-full">
-				<InputChat onSend={handleSend} showPrompts />
+			<div className="flex flex-1 flex-col items-center justify-center gap-4 px-4 h-full">
+				<ModelLoadingBanner
+					status={llm.status}
+					progress={llm.loadingProgress}
+					text={llm.loadingText}
+					error={llm.error}
+				/>
+				<InputChat onSend={handleSend} showPrompts disabled={isInputDisabled} />
 			</div>
 		);
 	}
 
 	return (
 		<div className="flex h-full w-full flex-col overflow-hidden">
-			<ChatConversation messages={messages} isLoading={isLoading} />
-			<div className="flex shrink-0 pb-20 justify-center  border-border px-4 py-4">
-				<InputChat onSend={handleSend} showPrompts={false} />
+			<ChatConversation
+				messages={messages}
+				isLoading={llm.isGenerating && (messages[messages.length - 1]?.content === "")}
+			/>
+			<div className="flex shrink-0 flex-col items-center gap-2 border-t border-border px-4 py-4">
+				<ModelLoadingBanner
+					status={llm.status}
+					progress={llm.loadingProgress}
+					text={llm.loadingText}
+					error={llm.error}
+				/>
+				<InputChat onSend={handleSend} showPrompts={false} disabled={isInputDisabled} />
 			</div>
 		</div>
 	);

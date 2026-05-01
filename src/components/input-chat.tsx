@@ -68,16 +68,17 @@ const MODELS = [
 type InputChatProps = {
   onSend: (text: string) => void;
   showPrompts?: boolean;
+  disabled?: boolean;
 };
 
-export default function InputChat({ onSend, showPrompts = true }: InputChatProps) {
+export default function InputChat({ onSend, showPrompts = true, disabled = false }: InputChatProps) {
   const [inputValue, setInputValue] = useState("");
   const [selectedModel, setSelectedModel] = useState(MODELS[0]);
   const inputRef = useRef<HTMLTextAreaElement>(null);
 
   const handleSend = () => {
     const trimmed = inputValue.trim();
-    if (!trimmed) return;
+    if (!trimmed || disabled) return;
     onSend(trimmed);
     setInputValue("");
   };
@@ -129,8 +130,9 @@ export default function InputChat({ onSend, showPrompts = true }: InputChatProps
             value={inputValue}
             onChange={(e) => setInputValue(e.target.value)}
             onKeyDown={handleKeyDown}
-            placeholder="Ask anything"
-            className="w-full border-0 p-3 transition-[padding] duration-200 ease-in-out min-h-[48.4px] outline-none text-[16px] text-foreground resize-none shadow-none focus-visible:ring-0 focus-visible:ring-offset-0 bg-transparent! whitespace-pre-wrap break-words"
+            placeholder={disabled ? "Waiting for model…" : "Ask anything"}
+            disabled={disabled}
+            className="w-full border-0 p-3 transition-[padding] duration-200 ease-in-out min-h-[48.4px] outline-none text-[16px] text-foreground resize-none shadow-none focus-visible:ring-0 focus-visible:ring-offset-0 bg-transparent! whitespace-pre-wrap break-words disabled:cursor-not-allowed disabled:opacity-50"
           />
         </div>
 
@@ -194,7 +196,7 @@ export default function InputChat({ onSend, showPrompts = true }: InputChatProps
                 "rounded-full transition-colors duration-100 ease-out cursor-pointer bg-primary",
                 inputValue && "bg-primary hover:bg-primary/90!"
               )}
-              disabled={!inputValue}
+              disabled={!inputValue || disabled}
               onClick={handleSend}
               aria-label="Send message"
             >

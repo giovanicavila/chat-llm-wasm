@@ -1,0 +1,48 @@
+name: Create Semver Labels
+
+on:
+  workflow_dispatch:
+
+jobs:
+  create-labels:
+    runs-on: ubuntu-latest
+    permissions:
+      issues: write
+    steps:
+      - name: Create semver labels
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const labels = [
+              { name: "major", color: "d73a4a", description: "Breaking change (major version bump)" },
+              { name: "minor", color: "0075ca", description: "New feature (minor version bump)" },
+              { name: "patch", color: "0e8a16", description: "Bug fix or chore (patch version bump)" },
+              { name: "dependencies", color: "ededed", description: "Dependency update" },
+              { name: "github-actions", color: "e4e669", description: "GitHub Actions update" },
+            ];
+
+            for (const label of labels) {
+              try {
+                await github.rest.issues.createLabel({
+                  owner: context.repo.owner,
+                  repo: context.repo.repo,
+                  name: label.name,
+                  color: label.color,
+                  description: label.description,
+                });
+                console.log(`Created label: ${label.name}`);
+              } catch (error) {
+                if (error.status === 422) {
+                  await github.rest.issues.updateLabel({
+                    owner: context.repo.owner,
+                    repo: context.repo.repo,
+                    name: label.name,
+                    color: label.color,
+                    description: label.description,
+                  });
+                  console.log(`Updated label: ${label.name}`);
+                } else {
+                  throw error;
+                }
+              }
+            }

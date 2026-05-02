@@ -91,8 +91,8 @@ export function HomePage() {
 	return (
 		<div className="flex h-full w-full flex-col overflow-hidden">
 			<ChatConversation
-				messages={messages}
-				isLoading={llm.isGenerating && (messages[messages.length - 1]?.content === "")}
+				messages={messages.filter((m) => m.content !== "")}
+				isLoading={llm.isGenerating}
 			/>
 			<div className="flex shrink-0 flex-col items-center gap-2 border-t border-border px-4 py-4">
 				<ModelLoadingBanner
